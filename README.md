@@ -24,7 +24,11 @@ Next.js (App Router, TypeScript) + Supabase + Tailwind. The full spec is in
    `supabase/migrations/0001_init.sql` then `supabase/seed.sql`. With the
    Supabase CLI linked to the project, `supabase db push` followed by
    `supabase db seed` does the same thing.
-4. `npm install && npm run dev`, then open http://localhost:3000.
+4. `npm install`, then `npm run verify` to check the database is set up
+   correctly. It confirms the tables, the 18 seeded components and a full PIN
+   hash round trip, creating and deleting one throwaway player.
+5. `npm run dev`, then open http://localhost:3000. Register a player and log
+   out and back in to confirm the session cookie sticks.
 
 The seed creates 6 stages × 3 placeholder components so the app runs before any
 real clue content exists. Stage 1 is released immediately and each later stage
@@ -45,5 +49,6 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
 
 - `npm run dev` — dev server
 - `npm run build` — production build
+- `npm run verify` — check a configured Supabase project (schema, seed, auth)
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` — ESLint
