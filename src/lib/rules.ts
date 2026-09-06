@@ -57,6 +57,17 @@ export type CaseFile = {
 
 export type Standing = { playerId: string; solved: number; furthestAt: string | null }
 
+export type ScanVerdict =
+  | {
+      unlocked: true
+      componentId: string
+      stage: number
+      title: string
+      fragment: string | null
+      alreadySolved: boolean
+    }
+  | { unlocked: false }
+
 export type AnswerVerdict =
   | { accepted: true; componentId: string; fragment: string | null }
   | { accepted: false; message: string }
@@ -199,4 +210,41 @@ export function checkAnswer(input: {
   }
 
   return { accepted: true, componentId: component.id, fragment: component.fragment }
+}
+
+/**
+ * Decides what a scanned QR token gets the player. A token that doesn't exist
+ * and one they haven't earned yet return the same locked verdict, so scanning
+ * a code from further ahead — or a made-up URL — reveals nothing either way.
+ */
+export function checkScan(input: {
+  components: Component[]
+  solved: Set<string>
+  token: string
+  now: number
+}): ScanVerdict {
+  const { components, solved, token, now } = input
+  if (!token) return { unlocked: false }
+
+  const component = components.find((candidate) => candidate.qr_token === token)
+  if (!component) return { unlocked: false }
+
+  const index = components.indexOf(component)
+  const alreadySolved = solved.has(component.id)
+
+  // Re-scanning something already found always works; anything new has to be
+  // the component they are actually on, and it has to be out (rules 2 and 3).
+  if (!alreadySolved) {
+    if (index !== currentIndex(components, solved)) return { unlocked: false }
+    if (!isReleased(component, now)) return { unlocked: false }
+  }
+
+  return {
+    unlocked: true,
+    componentId: component.id,
+    stage: component.stage,
+    title: component.title,
+    fragment: component.fragment,
+    alreadySolved,
+  }
 }

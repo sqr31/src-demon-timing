@@ -72,7 +72,10 @@ export function RegisterForm({ next }: { next: string }) {
 
       <p className="text-center text-muted">
         Already registered?{' '}
-        <Link className="text-accent underline" href="/login">
+        <Link
+          className="text-accent underline"
+          href={{ pathname: '/login', query: next === '/' ? undefined : { next } }}
+        >
           Log in
         </Link>
       </p>

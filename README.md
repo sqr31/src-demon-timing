@@ -8,7 +8,7 @@ Next.js (App Router, TypeScript) + Supabase + Tailwind. The full spec is in
 
 - [x] **1. Supabase schema + seed. Register, login, session cookie.**
 - [x] **2. Case file page, gating logic, answer submission.**
-- [ ] 3. `/s/[token]` with gating
+- [x] **3. `/s/[token]` with gating.**
 - [ ] 4. Leaderboard
 - [ ] 5. Admin page
 - [ ] 6. Deploy to Vercel
@@ -52,6 +52,22 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
   hasn't earned. Titles and clues of unreached or unreleased components are
   never sent to the browser.
 - Dates render in `Australia/Sydney` (`src/lib/format.ts`).
+- On `/s/[token]`, an unknown token and a locked one return the identical
+  response, so a scanned code from further ahead — or a guessed URL — tells the
+  player nothing. Re-scanning a code already found succeeds without touching the
+  original timestamp.
+
+## Testing a QR code with two players
+
+The build order asks for this check, and it needs two real accounts:
+
+1. In the SQL editor, get a token from a stage 1 component:
+   `select position, qr_token from components where stage = 1 order by position;`
+2. Register two players. Solve stage 1 as the first one, leave the second at
+   the start.
+3. Open `/s/<token of stage 1, component 3>` as each. The player who has worked
+   up to it sees "Evidence found" and the stage fragment; the one who hasn't
+   sees "Evidence locked" and nothing else — same page for a made-up token.
 
 ## Scripts
 

@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import {
   buildCaseFile,
   checkAnswer,
+  checkScan,
   type CaseFile,
   type Standing,
 } from '@/lib/rules'
@@ -114,4 +115,31 @@ export async function submitAnswer(playerId: string, raw: string): Promise<Solve
 
   await recordSolve(playerId, verdict.componentId)
   return { ok: true, message: 'Evidence found.', fragment: verdict.fragment ?? undefined }
+}
+
+export type ScanResult =
+  | { unlocked: true; stage: number; title: string; fragment: string | null }
+  | { unlocked: false }
+
+/**
+ * Resolves a QR landing. Recording the solve here is safe to repeat: the insert
+ * ignores conflicts, so a re-scan keeps the original timestamp (rule 6).
+ */
+export async function scanToken(playerId: string, token: string): Promise<ScanResult> {
+  const [components, solved] = await Promise.all([
+    componentsInOrder(),
+    solvedComponentIds(playerId),
+  ])
+
+  const verdict = checkScan({ components, solved, token, now: Date.now() })
+  if (!verdict.unlocked) return { unlocked: false }
+
+  if (!verdict.alreadySolved) await recordSolve(playerId, verdict.componentId)
+
+  return {
+    unlocked: true,
+    stage: verdict.stage,
+    title: verdict.title,
+    fragment: verdict.fragment,
+  }
 }

@@ -54,7 +54,10 @@ export function LoginForm({ next }: { next: string }) {
 
       <p className="text-center text-muted">
         No account yet?{' '}
-        <Link className="text-accent underline" href="/register">
+        <Link
+          className="text-accent underline"
+          href={{ pathname: '/register', query: next === '/' ? undefined : { next } }}
+        >
           Register
         </Link>
       </p>

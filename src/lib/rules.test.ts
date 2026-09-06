@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildCaseFile, checkAnswer, normaliseAnswer, rankOf } from './rules.ts'
+import { buildCaseFile, checkAnswer, checkScan, normaliseAnswer, rankOf } from './rules.ts'
 import type { Component } from './types.ts'
 
 const NOW = Date.parse('2026-09-10T00:00:00Z')
@@ -187,4 +187,73 @@ test('the footer counts players past the end of each stage', () => {
   })
 
   assert.deepEqual(file.passedPerStage.slice(0, 2), [2, 1])
+})
+
+test('scanning the code you are up to records it', () => {
+  // c1 is the qr component the fresh player is on.
+  const verdict = checkScan({ components: fixture(), solved: new Set(), token: 't1', now: NOW })
+
+  assert.equal(verdict.unlocked, true)
+  assert.equal(verdict.unlocked && verdict.componentId, 'c1')
+  assert.equal(verdict.unlocked && verdict.alreadySolved, false)
+})
+
+test('scanning a code further ahead stays locked', () => {
+  // t4 is the last component of stage 2; a fresh player is nowhere near it.
+  const verdict = checkScan({ components: fixture(), solved: new Set(), token: 't4', now: NOW })
+  assert.equal(verdict.unlocked, false)
+})
+
+test('an unknown token is indistinguishable from a locked one', () => {
+  const unknown = checkScan({ components: fixture(), solved: new Set(), token: 'nope', now: NOW })
+  const locked = checkScan({ components: fixture(), solved: new Set(), token: 't4', now: NOW })
+
+  assert.deepEqual(unknown, locked)
+  assert.deepEqual(unknown, { unlocked: false })
+})
+
+test('an empty token is locked', () => {
+  assert.deepEqual(
+    checkScan({ components: fixture(), solved: new Set(), token: '', now: NOW }),
+    { unlocked: false },
+  )
+})
+
+test('a code that is reachable but not released yet stays locked', () => {
+  const components = fixture([{ release_at: FUTURE }])
+  const verdict = checkScan({ components, solved: new Set(), token: 't1', now: NOW })
+  assert.equal(verdict.unlocked, false)
+})
+
+test('re-scanning something already found succeeds without re-solving it', () => {
+  const verdict = checkScan({
+    components: fixture(),
+    solved: new Set(['c1']),
+    token: 't1',
+    now: NOW,
+  })
+
+  assert.equal(verdict.unlocked, true)
+  assert.equal(verdict.unlocked && verdict.alreadySolved, true)
+})
+
+test('a code that completes a stage hands over the fragment', () => {
+  const verdict = checkScan({
+    components: fixture(),
+    solved: new Set(['c1', 'c2', 'c3']),
+    token: 't4',
+    now: NOW,
+  })
+
+  assert.equal(verdict.unlocked && verdict.fragment, 'FRAG-2')
+})
+
+test('the same code is open to one player and locked to another', () => {
+  // The two-player check from the build order, as a unit test.
+  const components = fixture()
+  const ahead = checkScan({ components, solved: new Set(['c1', 'c2', 'c3']), token: 't4', now: NOW })
+  const behind = checkScan({ components, solved: new Set(['c1']), token: 't4', now: NOW })
+
+  assert.equal(ahead.unlocked, true)
+  assert.equal(behind.unlocked, false)
 })
