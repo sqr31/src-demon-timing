@@ -11,3 +11,8 @@ export type SolveState = {
 }
 
 export const emptySolveState: SolveState = { ok: false, message: null, fragment: null }
+
+/** State for the admin edit forms, which need to say "saved" as well as "failed". */
+export type SaveState = { error: string | null; saved: boolean }
+
+export const emptySaveState: SaveState = { error: null, saved: false }

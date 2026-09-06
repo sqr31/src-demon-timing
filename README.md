@@ -10,7 +10,7 @@ Next.js (App Router, TypeScript) + Supabase + Tailwind. The full spec is in
 - [x] **2. Case file page, gating logic, answer submission.**
 - [x] **3. `/s/[token]` with gating.**
 - [x] **4. Leaderboard.**
-- [ ] 5. Admin page
+- [x] **5. Admin page.**
 - [ ] 6. Deploy to Vercel
 
 ## Setup
@@ -51,7 +51,12 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
   the request, so a hand-made form post can't reach a component the player
   hasn't earned. Titles and clues of unreached or unreleased components are
   never sent to the browser.
-- Dates render in `Australia/Sydney` (`src/lib/format.ts`).
+- Dates render in `Australia/Sydney` (`src/lib/format.ts`). Admin release times
+  are entered in that zone and converted both ways around the daylight saving
+  change the hunt runs across.
+- `/admin` is gated by a separate signed cookie from `ADMIN_PASSWORD`, throttled
+  the same way player logins are. Every admin action re-checks the cookie
+  itself, because Server Actions are reachable by direct POST.
 - On `/s/[token]`, an unknown token and a locked one return the identical
   response, so a scanned code from further ahead — or a guessed URL — tells the
   player nothing. The locked page carries a link back to the case file, which
