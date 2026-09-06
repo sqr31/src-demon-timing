@@ -54,8 +54,10 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
 - Dates render in `Australia/Sydney` (`src/lib/format.ts`).
 - On `/s/[token]`, an unknown token and a locked one return the identical
   response, so a scanned code from further ahead — or a guessed URL — tells the
-  player nothing. Re-scanning a code already found succeeds without touching the
-  original timestamp.
+  player nothing. The locked page carries a link back to the case file, which
+  reveals nothing and saves a dead end on a phone.
+- Re-scanning a code already found succeeds without touching the original
+  timestamp.
 
 ## Testing a QR code with two players
 

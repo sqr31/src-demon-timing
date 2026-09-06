@@ -19,6 +19,13 @@ export default async function ScanPage(props: PageProps<'/s/[token]'>) {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-5 py-10">
         <p className="text-xl">Evidence locked. You haven&apos;t found what leads here yet.</p>
+        {/* Says nothing about the component, and saves a dead end on a phone. */}
+        <Link
+          className="mt-8 block rounded-xl border border-border bg-surface px-4 py-3.5 text-center text-lg"
+          href="/"
+        >
+          Back to your case file
+        </Link>
       </main>
     )
   }
