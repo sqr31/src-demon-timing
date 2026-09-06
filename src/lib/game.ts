@@ -2,9 +2,11 @@ import 'server-only'
 import { db } from '@/lib/db'
 import {
   buildCaseFile,
+  buildLeaderboard,
   checkAnswer,
   checkScan,
   type CaseFile,
+  type Leaderboard,
   type Standing,
 } from '@/lib/rules'
 import type { Component } from '@/lib/types'
@@ -142,4 +144,25 @@ export async function scanToken(playerId: string, token: string): Promise<ScanRe
     title: verdict.title,
     fragment: verdict.fragment,
   }
+}
+
+/** The leaderboard lists everyone, so players yet to solve anything appear too. */
+async function allPlayers(): Promise<{ id: string; display_name: string }[]> {
+  const { data, error } = await db()
+    .from('players')
+    .select('id, display_name')
+    .range(0, 9999)
+
+  if (error) throw error
+  return (data ?? []) as { id: string; display_name: string }[]
+}
+
+export async function loadLeaderboard(viewerId: string | null): Promise<Leaderboard> {
+  const [players, all, components] = await Promise.all([
+    allPlayers(),
+    standings(),
+    componentsInOrder(),
+  ])
+
+  return buildLeaderboard({ players, standings: all, components, viewerId, limit: 50 })
 }

@@ -9,7 +9,7 @@ Next.js (App Router, TypeScript) + Supabase + Tailwind. The full spec is in
 - [x] **1. Supabase schema + seed. Register, login, session cookie.**
 - [x] **2. Case file page, gating logic, answer submission.**
 - [x] **3. `/s/[token]` with gating.**
-- [ ] 4. Leaderboard
+- [x] **4. Leaderboard.**
 - [ ] 5. Admin page
 - [ ] 6. Deploy to Vercel
 

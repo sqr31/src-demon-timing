@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { logout } from '@/app/actions'
 import { CluePanel } from '@/components/clue-panel'
@@ -39,11 +40,16 @@ export default async function CaseFilePage() {
             </span>
           ))}
         </p>
-        <form action={logout} className="mt-4">
-          <button className="text-accent underline" type="submit">
-            Log out
-          </button>
-        </form>
+        <div className="mt-4 flex gap-4">
+          <Link className="text-accent underline" href="/leaderboard">
+            Leaderboard
+          </Link>
+          <form action={logout}>
+            <button className="text-accent underline" type="submit">
+              Log out
+            </button>
+          </form>
+        </div>
       </footer>
     </main>
   )

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildCaseFile, checkAnswer, checkScan, normaliseAnswer, rankOf } from './rules.ts'
+import {
+  buildCaseFile,
+  buildLeaderboard,
+  checkAnswer,
+  checkScan,
+  normaliseAnswer,
+  rankOf,
+  stageReached,
+} from './rules.ts'
 import type { Component } from './types.ts'
 
 const NOW = Date.parse('2026-09-10T00:00:00Z')
@@ -256,4 +264,87 @@ test('the same code is open to one player and locked to another', () => {
 
   assert.equal(ahead.unlocked, true)
   assert.equal(behind.unlocked, false)
+})
+
+const PLAYERS = [
+  { id: 'ahead', display_name: 'Ada' },
+  { id: 'middle', display_name: 'Bo' },
+  { id: 'behind', display_name: 'Cy' },
+  { id: 'fresh', display_name: 'Dee' },
+]
+
+const STANDINGS = [
+  { playerId: 'ahead', solved: 4, furthestAt: '2026-09-05T00:00:00Z' },
+  { playerId: 'middle', solved: 2, furthestAt: '2026-09-02T00:00:00Z' },
+  { playerId: 'behind', solved: 2, furthestAt: '2026-09-04T00:00:00Z' },
+]
+
+function leaderboard(viewerId: string | null, limit = 50) {
+  return buildLeaderboard({
+    players: PLAYERS,
+    standings: STANDINGS,
+    components: fixture(),
+    viewerId,
+    limit,
+  })
+}
+
+test('a solve count maps to the stage it reached', () => {
+  const components = fixture()
+  assert.equal(stageReached(components, 0), null)
+  assert.equal(stageReached(components, 1), 1)
+  assert.equal(stageReached(components, 2), 1)
+  assert.equal(stageReached(components, 3), 2)
+  assert.equal(stageReached(components, 4), 2)
+})
+
+test('the leaderboard orders by progress, then by who got there first', () => {
+  const { rows } = leaderboard(null)
+  assert.deepEqual(
+    rows.map((row) => [row.rank, row.displayName]),
+    [
+      [1, 'Ada'],
+      [2, 'Bo'],
+      [3, 'Cy'],
+      [4, 'Dee'],
+    ],
+  )
+})
+
+test('a player with no solves shows no stage', () => {
+  const { rows } = leaderboard(null)
+  assert.equal(rows[3].stage, null)
+  assert.equal(rows[0].stage, 2)
+})
+
+test('the viewer is marked, and only the viewer', () => {
+  const { rows } = leaderboard('behind')
+  assert.deepEqual(
+    rows.filter((row) => row.isViewer).map((row) => row.displayName),
+    ['Cy'],
+  )
+})
+
+test('a viewer outside the cut is returned as an extra row', () => {
+  const { rows, viewerRow } = leaderboard('fresh', 2)
+
+  assert.equal(rows.length, 2)
+  assert.equal(viewerRow?.displayName, 'Dee')
+  assert.equal(viewerRow?.rank, 4)
+})
+
+test('a viewer inside the cut is not repeated', () => {
+  const { viewerRow } = leaderboard('ahead', 2)
+  assert.equal(viewerRow, null)
+})
+
+test('a logged-out viewer gets no extra row', () => {
+  const { viewerRow } = leaderboard(null, 1)
+  assert.equal(viewerRow, null)
+})
+
+test('leaderboard ranks agree with the rank on the case file', () => {
+  for (const row of leaderboard(null).rows) {
+    assert.equal(row.rank, rankOf(row.playerId, STANDINGS), row.displayName)
+  }
 })

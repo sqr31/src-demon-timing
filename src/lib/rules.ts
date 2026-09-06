@@ -57,6 +57,22 @@ export type CaseFile = {
 
 export type Standing = { playerId: string; solved: number; furthestAt: string | null }
 
+export type LeaderboardRow = {
+  rank: number
+  playerId: string
+  displayName: string
+  /** Null until their first solve. */
+  stage: number | null
+  isViewer: boolean
+}
+
+export type Leaderboard = {
+  rows: LeaderboardRow[]
+  /** Set only when the viewer finished outside the listed rows. */
+  viewerRow: LeaderboardRow | null
+  totalPlayers: number
+}
+
 export type ScanVerdict =
   | {
       unlocked: true
@@ -247,4 +263,58 @@ export function checkScan(input: {
     fragment: component.fragment,
     alreadySolved,
   }
+}
+
+/**
+ * How far a solve count has carried a player. Solving is strictly ordered, so
+ * the count alone identifies the component they last found.
+ */
+export function stageReached(components: Component[], solved: number): number | null {
+  if (solved <= 0) return null
+  return components[Math.min(solved, components.length) - 1].stage
+}
+
+export function buildLeaderboard(input: {
+  players: { id: string; display_name: string }[]
+  standings: Standing[]
+  components: Component[]
+  viewerId: string | null
+  limit: number
+}): Leaderboard {
+  const { players, standings, components, viewerId, limit } = input
+  const byPlayer = new Map(standings.map((standing) => [standing.playerId, standing]))
+
+  const all = players
+    .map((player) => {
+      const standing = byPlayer.get(player.id)
+      const solved = standing?.solved ?? 0
+      return {
+        solved,
+        furthestAt: standing?.furthestAt ?? null,
+        row: {
+          rank: rankOf(player.id, standings),
+          playerId: player.id,
+          displayName: player.display_name,
+          stage: stageReached(components, solved),
+          isViewer: player.id === viewerId,
+        },
+      }
+    })
+    .sort((a, b) => {
+      if (a.solved !== b.solved) return b.solved - a.solved
+      if (a.furthestAt && b.furthestAt && a.furthestAt !== b.furthestAt) {
+        return a.furthestAt < b.furthestAt ? -1 : 1
+      }
+      // A stable, name-ordered fallback so equal players don't shuffle between loads.
+      return a.row.displayName.localeCompare(b.row.displayName)
+    })
+    .map((entry) => entry.row)
+
+  const rows = all.slice(0, limit)
+  const viewerRow =
+    viewerId && !rows.some((row) => row.isViewer)
+      ? (all.find((row) => row.isViewer) ?? null)
+      : null
+
+  return { rows, viewerRow, totalPlayers: players.length }
 }
