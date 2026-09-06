@@ -1,0 +1,190 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { buildCaseFile, checkAnswer, normaliseAnswer, rankOf } from './rules.ts'
+import type { Component } from './types.ts'
+
+const NOW = Date.parse('2026-09-10T00:00:00Z')
+const PAST = '2026-09-01T00:00:00Z'
+const FUTURE = '2026-09-20T00:00:00Z'
+
+/** Two stages of two components: qr then answer, the answer one carrying the fragment. */
+function fixture(overrides: Partial<Component>[] = []): Component[] {
+  const base: Component[] = [
+    { stage: 1, position: 1, title: 'One', solve_type: 'qr', qr_token: 't1', answer: null, fragment: null },
+    { stage: 1, position: 2, title: 'Two', solve_type: 'answer', qr_token: null, answer: 'Blue Whale', fragment: 'FRAG-1' },
+    { stage: 2, position: 1, title: 'Three', solve_type: 'answer', qr_token: null, answer: 'x', fragment: null },
+    { stage: 2, position: 2, title: 'Four', solve_type: 'qr', qr_token: 't4', answer: null, fragment: 'FRAG-2' },
+  ].map((partial, index) => ({
+    id: `c${index + 1}`,
+    clue_text: `Clue ${index + 1}`,
+    release_at: PAST,
+    hint_text: `Hint ${index + 1}`,
+    hint_released: false,
+    ...partial,
+  })) as Component[]
+
+  return base.map((component, index) => ({ ...component, ...overrides[index] }))
+}
+
+function caseFileFor(solvedIds: string[], components = fixture()) {
+  return buildCaseFile({
+    playerId: 'me',
+    components,
+    solved: new Set(solvedIds),
+    standings: [{ playerId: 'me', solved: solvedIds.length, furthestAt: PAST }],
+    totalPlayers: 1,
+    now: NOW,
+  })
+}
+
+test('the current component is the first unsolved one', () => {
+  const fresh = caseFileFor([])
+  assert.equal(fresh.current.kind, 'clue')
+  assert.equal(fresh.current.kind === 'clue' && fresh.current.title, 'One')
+
+  const partway = caseFileFor(['c1', 'c2'])
+  assert.equal(partway.current.kind === 'clue' && partway.current.title, 'Three')
+})
+
+test('later components stay locked and unnamed', () => {
+  const stageOne = caseFileFor([]).stages[0]
+  assert.deepEqual(
+    stageOne.items.map((item) => [item.state, item.title]),
+    [
+      ['current', 'One'],
+      ['locked', null],
+    ],
+  )
+})
+
+test('gating spans stages, not just the stage you are in', () => {
+  // Stage 2 is untouchable while anything in stage 1 is unsolved.
+  const stageTwo = caseFileFor(['c1']).stages[1]
+  assert.deepEqual(
+    stageTwo.items.map((item) => item.state),
+    ['locked', 'locked'],
+  )
+})
+
+test('an unreleased component hides its title and clue', () => {
+  const components = fixture([{}, { release_at: FUTURE }])
+  const file = caseFileFor(['c1'], components)
+
+  assert.equal(file.current.kind, 'waiting')
+  assert.equal(file.stages[0].items[1].title, null)
+})
+
+test('a stage awards its fragment only once every component is solved', () => {
+  assert.equal(caseFileFor(['c1']).stages[0].fragment, null)
+  assert.equal(caseFileFor(['c1', 'c2']).stages[0].fragment, 'FRAG-1')
+})
+
+test('finishing everything closes the case', () => {
+  const file = caseFileFor(['c1', 'c2', 'c3', 'c4'])
+  assert.equal(file.current.kind, 'done')
+  // The fixture only defines two stages, and empty stages are left out.
+  assert.deepEqual(
+    file.stages.map((stage) => stage.complete),
+    [true, true],
+  )
+})
+
+test('a hint shows only once it is released', () => {
+  const hidden = caseFileFor([], fixture([{ hint_released: false }]))
+  assert.equal(hidden.current.kind === 'clue' && hidden.current.hint, null)
+
+  const shown = caseFileFor([], fixture([{ hint_released: true }]))
+  assert.equal(shown.current.kind === 'clue' && shown.current.hint, 'Hint 1')
+})
+
+test('answers ignore case and whitespace', () => {
+  assert.equal(normaliseAnswer('  Blue   WHALE '), 'bluewhale')
+
+  for (const raw of ['Blue Whale', 'bluewhale', '  BLUE   whale  ']) {
+    const verdict = checkAnswer({ components: fixture(), solved: new Set(['c1']), raw, now: NOW })
+    assert.equal(verdict.accepted, true, `${raw} should be accepted`)
+  }
+})
+
+test('a wrong answer is rejected and solves nothing', () => {
+  const verdict = checkAnswer({
+    components: fixture(),
+    solved: new Set(['c1']),
+    raw: 'orca',
+    now: NOW,
+  })
+  assert.equal(verdict.accepted, false)
+})
+
+test('an empty answer is rejected', () => {
+  const verdict = checkAnswer({ components: fixture(), solved: new Set(['c1']), raw: '   ', now: NOW })
+  assert.equal(verdict.accepted, false)
+})
+
+test('a correct answer typed at a qr component is rejected', () => {
+  // c1 is a qr component, so nothing typed can solve it.
+  const verdict = checkAnswer({ components: fixture(), solved: new Set(), raw: 't1', now: NOW })
+  assert.equal(verdict.accepted, false)
+})
+
+test('the right answer to an unreleased component is still rejected', () => {
+  const components = fixture([{}, { release_at: FUTURE }])
+  const verdict = checkAnswer({
+    components,
+    solved: new Set(['c1']),
+    raw: 'Blue Whale',
+    now: NOW,
+  })
+  assert.equal(verdict.accepted, false)
+})
+
+test('answering the last component of a stage returns its fragment', () => {
+  const verdict = checkAnswer({
+    components: fixture(),
+    solved: new Set(['c1']),
+    raw: 'blue whale',
+    now: NOW,
+  })
+  assert.equal(verdict.accepted && verdict.fragment, 'FRAG-1')
+})
+
+test('rank goes by furthest component, then by who got there first', () => {
+  const all = [
+    { playerId: 'ahead', solved: 3, furthestAt: '2026-09-05T00:00:00Z' },
+    { playerId: 'early', solved: 2, furthestAt: '2026-09-02T00:00:00Z' },
+    { playerId: 'late', solved: 2, furthestAt: '2026-09-04T00:00:00Z' },
+    { playerId: 'nothing', solved: 0, furthestAt: null },
+  ]
+
+  assert.equal(rankOf('ahead', all), 1)
+  assert.equal(rankOf('early', all), 2)
+  assert.equal(rankOf('late', all), 3)
+  assert.equal(rankOf('nothing', all), 4)
+})
+
+test('players who have solved nothing all tie for last', () => {
+  const all = [
+    { playerId: 'ahead', solved: 1, furthestAt: PAST },
+    { playerId: 'a', solved: 0, furthestAt: null },
+    { playerId: 'b', solved: 0, furthestAt: null },
+  ]
+  assert.equal(rankOf('a', all), 2)
+  assert.equal(rankOf('b', all), 2)
+})
+
+test('the footer counts players past the end of each stage', () => {
+  const file = buildCaseFile({
+    playerId: 'me',
+    components: fixture(),
+    solved: new Set(),
+    standings: [
+      { playerId: 'me', solved: 0, furthestAt: null },
+      { playerId: 'one', solved: 2, furthestAt: PAST }, // finished stage 1
+      { playerId: 'two', solved: 4, furthestAt: PAST }, // finished both
+    ],
+    totalPlayers: 3,
+    now: NOW,
+  })
+
+  assert.deepEqual(file.passedPerStage.slice(0, 2), [2, 1])
+})

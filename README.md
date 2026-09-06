@@ -7,7 +7,7 @@ Next.js (App Router, TypeScript) + Supabase + Tailwind. The full spec is in
 ## Build progress
 
 - [x] **1. Supabase schema + seed. Register, login, session cookie.**
-- [ ] 2. Case file page, gating logic, answer submission
+- [x] **2. Case file page, gating logic, answer submission.**
 - [ ] 3. `/s/[token]` with gating
 - [ ] 4. Leaderboard
 - [ ] 5. Admin page
@@ -44,11 +44,20 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
 - Login attempts are throttled to 10 failures per student ID per 15 minutes,
   tracked in the `login_attempts` table because serverless instances share no
   memory.
+- The game rules live in `src/lib/rules.ts` as pure functions of the components,
+  a player's solves and the current time, with the database access alongside in
+  `src/lib/game.ts`. That split is what `npm test` exercises.
+- Gating is resolved on the server from the player's own progress, never from
+  the request, so a hand-made form post can't reach a component the player
+  hasn't earned. Titles and clues of unreached or unreleased components are
+  never sent to the browser.
+- Dates render in `Australia/Sydney` (`src/lib/format.ts`).
 
 ## Scripts
 
 - `npm run dev` — dev server
 - `npm run build` — production build
+- `npm test` — the game rules (gating, release times, answers, ranking)
 - `npm run verify` — check a configured Supabase project (schema, seed, auth)
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` — ESLint

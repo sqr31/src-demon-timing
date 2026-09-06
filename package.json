@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "verify": "node --env-file=.env.local scripts/verify-setup.mjs"
+    "verify": "node --env-file=.env.local scripts/verify-setup.mjs",
+    "test": "node --test src/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",
@@ -17,6 +18,7 @@
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

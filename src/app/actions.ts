@@ -1,10 +1,12 @@
 'use server'
 
+import { refresh } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { loginPlayer, registerPlayer } from '@/lib/auth'
-import { type FormState } from '@/lib/form'
+import { type FormState, type SolveState } from '@/lib/form'
+import { submitAnswer } from '@/lib/game'
 import { safeNext } from '@/lib/paths'
-import { clearSession, createSession } from '@/lib/session'
+import { clearSession, createSession, getSessionPlayerId } from '@/lib/session'
 
 function field(formData: FormData, name: string): string {
   const value = formData.get(name)
@@ -40,4 +42,16 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
 export async function logout() {
   await clearSession()
   redirect('/login')
+}
+
+export async function answer(_prev: SolveState, formData: FormData): Promise<SolveState> {
+  const playerId = await getSessionPlayerId()
+  if (!playerId) redirect('/login')
+
+  const outcome = await submitAnswer(playerId, field(formData, 'answer'))
+  // Re-render the case file so the stage cards and the next clue update behind
+  // the message.
+  if (outcome.ok) refresh()
+
+  return { ok: outcome.ok, message: outcome.message, fragment: outcome.fragment ?? null }
 }
