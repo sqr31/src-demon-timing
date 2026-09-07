@@ -4,8 +4,10 @@ import {
   buildCaseFile,
   buildLeaderboard,
   checkAnswer,
+  checkCode,
   checkScan,
   normaliseAnswer,
+  normaliseCode,
   rankOf,
   stageReached,
 } from './rules.ts'
@@ -346,5 +348,71 @@ test('a logged-out viewer gets no extra row', () => {
 test('leaderboard ranks agree with the rank on the case file', () => {
   for (const row of leaderboard(null).rows) {
     assert.equal(row.rank, rankOf(row.playerId, STANDINGS), row.displayName)
+  }
+})
+
+test('a typed code forgives case, spaces and dashes', () => {
+  assert.equal(normaliseCode(' T1 '), 't1')
+  assert.equal(normaliseCode('942-226 A3B4'), '942226a3b4')
+
+  for (const typed of ['t1', 'T1', ' t 1 ', 't-1']) {
+    const verdict = checkCode({
+      components: fixture(),
+      solved: new Set(),
+      code: typed,
+      now: NOW,
+    })
+    assert.equal(verdict.unlocked, true, `${typed} should be accepted`)
+  }
+})
+
+test('a typed code obeys the same gating as a scan', () => {
+  // t4 belongs to a component two stages ahead.
+  const ahead = checkCode({ components: fixture(), solved: new Set(), code: 't4', now: NOW })
+  assert.equal(ahead.unlocked, false)
+
+  const unreleased = checkCode({
+    components: fixture([{ release_at: FUTURE }]),
+    solved: new Set(),
+    code: 't1',
+    now: NOW,
+  })
+  assert.equal(unreleased.unlocked, false)
+})
+
+test('an unknown typed code looks like a locked one', () => {
+  const unknown = checkCode({ components: fixture(), solved: new Set(), code: 'zzzz', now: NOW })
+  const locked = checkCode({ components: fixture(), solved: new Set(), code: 't4', now: NOW })
+
+  assert.deepEqual(unknown, locked)
+})
+
+test('an empty typed code is rejected', () => {
+  assert.deepEqual(
+    checkCode({ components: fixture(), solved: new Set(), code: '   ', now: NOW }),
+    { unlocked: false },
+  )
+})
+
+test("a typed code can't stand in for an answer component", () => {
+  // c2 is solved by typing its answer, and has no token to enter.
+  const verdict = checkCode({
+    components: fixture(),
+    solved: new Set(['c1']),
+    code: 'Blue Whale',
+    now: NOW,
+  })
+  assert.equal(verdict.unlocked, false)
+})
+
+test('typing a code reaches the same verdict as scanning it', () => {
+  for (const solved of [new Set<string>(), new Set(['c1']), new Set(['c1', 'c2', 'c3'])]) {
+    for (const token of ['t1', 't4', 'nope']) {
+      assert.deepEqual(
+        checkCode({ components: fixture(), solved, code: token, now: NOW }),
+        checkScan({ components: fixture(), solved, token, now: NOW }),
+        `${token} with ${solved.size} solved`,
+      )
+    }
   }
 })

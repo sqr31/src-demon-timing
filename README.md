@@ -63,6 +63,10 @@ one week after the previous one; all of it is editable from `/admin` in step 5.
   reveals nothing and saves a dead end on a phone.
 - Re-scanning a code already found succeeds without touching the original
   timestamp.
+- A QR component can also be solved by typing its code on the case file, for a
+  camera that won't focus. Same gating as a scan — a test asserts the two agree
+  on every case — but forgiving about case, spaces and dashes, and throttled to
+  20 wrong tries per player per 15 minutes.
 
 ## Testing a QR code with two players
 

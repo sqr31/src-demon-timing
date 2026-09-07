@@ -4,6 +4,7 @@ import {
   buildCaseFile,
   buildLeaderboard,
   checkAnswer,
+  checkCode,
   checkScan,
   type CaseFile,
   type Leaderboard,
@@ -165,4 +166,66 @@ export async function loadLeaderboard(viewerId: string | null): Promise<Leaderbo
   ])
 
   return buildLeaderboard({ players, standings: all, components, viewerId, limit: 50 })
+}
+
+const CODE_ATTEMPT_WINDOW_MINUTES = 15
+const CODE_ATTEMPT_MAX = 20
+
+/**
+ * The typed fallback for a camera that won't scan. It can only ever solve the
+ * component the player is already on, so guessing buys at most one step — but
+ * it is throttled anyway, since a wrong code costs nothing to try.
+ */
+export async function enterCode(playerId: string, code: string): Promise<SolveOutcome> {
+  if (!code.trim()) return { ok: false, message: 'Type the code first.' }
+
+  const attemptKey = `code:${playerId}`
+  if (await tooManyCodeAttempts(attemptKey)) {
+    return {
+      ok: false,
+      message: `Too many tries. Wait ${CODE_ATTEMPT_WINDOW_MINUTES} minutes and try again.`,
+    }
+  }
+
+  const [components, solved] = await Promise.all([
+    componentsInOrder(),
+    solvedComponentIds(playerId),
+  ])
+
+  const verdict = checkCode({ components, solved, code, now: Date.now() })
+  if (!verdict.unlocked) {
+    await recordCodeAttempt(attemptKey)
+    return { ok: false, message: "That code isn't right for this clue." }
+  }
+
+  if (!verdict.alreadySolved) await recordSolve(playerId, verdict.componentId)
+
+  return { ok: true, message: 'Evidence found.', fragment: verdict.fragment ?? undefined }
+}
+
+function codeWindowStart(): string {
+  return new Date(Date.now() - CODE_ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString()
+}
+
+async function tooManyCodeAttempts(key: string): Promise<boolean> {
+  const { count, error } = await db()
+    .from('login_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', key)
+    .gte('attempted_at', codeWindowStart())
+
+  if (error) throw error
+  return (count ?? 0) >= CODE_ATTEMPT_MAX
+}
+
+async function recordCodeAttempt(key: string): Promise<void> {
+  const client = db()
+  const { error } = await client.from('login_attempts').insert({ student_id: key })
+  if (error) throw error
+
+  await client
+    .from('login_attempts')
+    .delete()
+    .eq('student_id', key)
+    .lt('attempted_at', codeWindowStart())
 }

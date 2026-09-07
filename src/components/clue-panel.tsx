@@ -1,5 +1,6 @@
 import Markdown from 'react-markdown'
 import { AnswerBox } from '@/components/answer-box'
+import { CodeBox } from '@/components/code-box'
 import type { CurrentView } from '@/lib/rules'
 import { formatReleaseDateTime } from '@/lib/format'
 
@@ -54,9 +55,10 @@ export function CluePanel({ current }: { current: CurrentView }) {
       {current.solveType === 'answer' ? (
         <AnswerBox />
       ) : (
-        <p className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
-          Scan the code where the clue leads.
-        </p>
+        <div className="mt-4 rounded-xl border border-border bg-background px-4 py-3">
+          <p>Scan the code where the clue leads.</p>
+          <CodeBox />
+        </div>
       )}
     </section>
   )

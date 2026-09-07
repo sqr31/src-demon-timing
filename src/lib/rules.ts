@@ -242,13 +242,49 @@ export function checkScan(input: {
   const { components, solved, token, now } = input
   if (!token) return { unlocked: false }
 
+  // A scanned URL carries the token exactly as it was printed.
   const component = components.find((candidate) => candidate.qr_token === token)
+  return verify(components, solved, component, now)
+}
+
+/**
+ * Typed by hand instead of scanned, for a camera that won't focus. Same gating,
+ * but forgiving about case and the spaces or dashes someone adds while reading
+ * a code off a poster.
+ */
+export function normaliseCode(raw: string): string {
+  return raw.toLowerCase().replace(/[\s-]/g, '')
+}
+
+export function checkCode(input: {
+  components: Component[]
+  solved: Set<string>
+  code: string
+  now: number
+}): ScanVerdict {
+  const { components, solved, code, now } = input
+  const wanted = normaliseCode(code)
+  if (!wanted) return { unlocked: false }
+
+  const component = components.find(
+    (candidate) => candidate.qr_token && normaliseCode(candidate.qr_token) === wanted,
+  )
+  return verify(components, solved, component, now)
+}
+
+function verify(
+  components: Component[],
+  solved: Set<string>,
+  component: Component | undefined,
+  now: number,
+): ScanVerdict {
+  // An unknown code and one they haven't earned return the same verdict.
   if (!component) return { unlocked: false }
 
   const index = components.indexOf(component)
   const alreadySolved = solved.has(component.id)
 
-  // Re-scanning something already found always works; anything new has to be
+  // Re-entering something already found always works; anything new has to be
   // the component they are actually on, and it has to be out (rules 2 and 3).
   if (!alreadySolved) {
     if (index !== currentIndex(components, solved)) return { unlocked: false }

@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { loginPlayer, registerPlayer } from '@/lib/auth'
 import { type FormState, type SolveState } from '@/lib/form'
-import { submitAnswer } from '@/lib/game'
+import { enterCode, submitAnswer } from '@/lib/game'
 import { safeNext } from '@/lib/paths'
 import { clearSession, createSession, getSessionPlayerId } from '@/lib/session'
 
@@ -51,6 +51,16 @@ export async function answer(_prev: SolveState, formData: FormData): Promise<Sol
   const outcome = await submitAnswer(playerId, field(formData, 'answer'))
   // Re-render the case file so the stage cards and the next clue update behind
   // the message.
+  if (outcome.ok) refresh()
+
+  return { ok: outcome.ok, message: outcome.message, fragment: outcome.fragment ?? null }
+}
+
+export async function submitCode(_prev: SolveState, formData: FormData): Promise<SolveState> {
+  const playerId = await getSessionPlayerId()
+  if (!playerId) redirect('/login')
+
+  const outcome = await enterCode(playerId, field(formData, 'code'))
   if (outcome.ok) refresh()
 
   return { ok: outcome.ok, message: outcome.message, fragment: outcome.fragment ?? null }
